@@ -1,0 +1,21 @@
+import { createClient } from "@supabase/supabase-js";
+
+const url = import.meta.env.VITE_SUPABASE_URL;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!url || !anonKey) {
+  throw new Error(
+    "VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY belum diisi. " +
+      "Salin .env.example jadi .env.local lalu isi dari Supabase Dashboard, " +
+      "dan restart `npm run dev`.",
+  );
+}
+
+export const supabase = createClient(url, anonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
+
+export const MEMORY_BUCKET = "memories";
