@@ -1,58 +1,19 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { FloatingHearts } from "@/components/FloatingHearts";
 import { useRoom } from "@/context/RoomContext";
 import { useSession } from "@/context/SessionContext";
-import { TEMPLATES, type PhotoCount, type TemplateId } from "@/lib/types";
+import { composeTemplatePreview } from "@/lib/compose";
+import {
+  TEMPLATES,
+  THEME_LABEL,
+  type PhotoCount,
+  type TemplateId,
+  type TemplateTheme,
+} from "@/lib/types";
 
-/** Satu sel = dua potret berdampingan (kamu | pasangan). */
-function PairCell({ dark = false }: { dark?: boolean }) {
-  const tone = dark ? "bg-accent/50" : "bg-accent/60";
-  return (
-    <div className="flex gap-[2px]">
-      <div className={`h-6 flex-1 rounded-[1px] ${tone}`} />
-      <div className={`h-6 flex-1 rounded-[1px] ${tone}`} />
-    </div>
-  );
-}
-
-const PREVIEWS: Record<TemplateId, ReactElement> = {
-  polaroid: (
-    <div className="mt-4 flex justify-center">
-      <div className="w-24 rotate-2 space-y-[3px] border border-gray-100 bg-white p-1.5 pb-5 shadow">
-        <PairCell />
-        <PairCell />
-      </div>
-    </div>
-  ),
-  film: (
-    <div className="mt-4 flex justify-center">
-      <div className="w-24 space-y-1 rounded-lg bg-gray-900 p-1.5">
-        <div className="flex justify-around">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-1 w-1.5 rounded-sm bg-gray-700" />
-          ))}
-        </div>
-        <PairCell dark />
-        <PairCell dark />
-        <div className="flex justify-around">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-1 w-1.5 rounded-sm bg-gray-700" />
-          ))}
-        </div>
-      </div>
-    </div>
-  ),
-  retro: (
-    <div className="mt-4 flex justify-center">
-      <div className="w-24 space-y-[3px] rounded-lg bg-gray-800 p-1.5 pb-4">
-        <PairCell dark />
-        <PairCell dark />
-      </div>
-    </div>
-  ),
-};
+const THEMES: TemplateTheme[] = ["pink", "aqua", "classic"];
 
 export function TemplateSelectionPage() {
   const { partner, template, count, setSetup } = useSession();
@@ -71,6 +32,16 @@ export function TemplateSelectionPage() {
   // Controller yang memilih; participant hanya melihat pilihan controller.
   const selected = isController ? ownTemplate : sharedTemplate;
   const photoCount = isController ? ownCount : sharedCount;
+
+  /**
+   * Pratinjau digambar oleh kode yang sama dengan hasil akhirnya, dengan slot
+   * dibiarkan kosong — jadi kartu ini tidak mungkin berbeda dari hasil jadi.
+   */
+  const previews = useMemo(() => {
+    const map: Partial<Record<TemplateId, string>> = {};
+    for (const t of TEMPLATES) map[t.id] = composeTemplatePreview(t.id, photoCount);
+    return map;
+  }, [photoCount]);
 
   useEffect(() => {
     if (isController) setStage("templates");
@@ -116,8 +87,8 @@ export function TemplateSelectionPage() {
             <div className="bg-secondary h-2 w-2 animate-pulse rounded-full" />
             <span className="text-secondary text-xs font-semibold">
               {isController
-                ? `${partner?.name} mengikuti pilihanmu`
-                : `${partner?.name} sedang memilih untuk kalian berdua...`}
+                ? `${partner?.name} follows your pick`
+                : `${partner?.name} is picking for the two of you...`}
             </span>
           </div>
           <h2 className="text-foreground font-display text-2xl font-bold sm:text-3xl">
@@ -127,35 +98,8 @@ export function TemplateSelectionPage() {
             Pick how you want to preserve this memory
           </p>
           <p className="text-muted-foreground/70 mt-1 text-xs">
-            Tiap jepretan memuat kalian berdua berdampingan
+            Every slot holds the two of you, side by side
           </p>
-        </div>
-
-        <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => pickTemplate(t.id)}
-              disabled={!isController}
-              className={`group relative rounded-3xl border-2 bg-white p-6 text-left transition-all hover:shadow-lg ${
-                selected === t.id
-                  ? "border-primary shadow-primary/10 shadow-lg"
-                  : "border-border hover:border-primary/30"
-              }`}
-            >
-              {selected === t.id && (
-                <div className="bg-primary absolute top-4 right-4 flex h-6 w-6 items-center justify-center rounded-full shadow-sm">
-                  <Check className="h-3 w-3 text-white" />
-                </div>
-              )}
-              <div className="mb-3 text-3xl">{t.icon}</div>
-              <h3 className="text-foreground font-display mb-1 text-sm font-bold">
-                {t.name}
-              </h3>
-              <p className="text-muted-foreground text-xs">{t.desc}</p>
-              {PREVIEWS[t.id]}
-            </button>
-          ))}
         </div>
 
         <div className="border-border mb-7 rounded-3xl border bg-white/80 p-6 backdrop-blur-xl">
@@ -180,6 +124,45 @@ export function TemplateSelectionPage() {
           </div>
         </div>
 
+        {THEMES.map((theme) => (
+          <div key={theme} className="mb-8">
+            <h3 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+              {THEME_LABEL[theme]}
+            </h3>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {TEMPLATES.filter((t) => t.theme === theme).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => pickTemplate(t.id)}
+                  disabled={!isController}
+                  className={`relative rounded-3xl border-2 bg-white p-4 text-left transition-all hover:shadow-lg ${
+                    selected === t.id
+                      ? "border-primary shadow-primary/10 shadow-lg"
+                      : "border-border hover:border-primary/30"
+                  }`}
+                >
+                  {selected === t.id && (
+                    <div className="bg-primary absolute top-3 right-3 z-10 flex h-6 w-6 items-center justify-center rounded-full shadow-sm">
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  <div className="bg-muted mb-3 flex justify-center overflow-hidden rounded-2xl p-3">
+                    <img
+                      src={previews[t.id]}
+                      alt={`${t.name} template preview`}
+                      className="max-h-44 w-auto rounded-md shadow-sm"
+                    />
+                  </div>
+                  <h4 className="text-foreground font-display text-sm font-bold">
+                    {t.icon} {t.name}
+                  </h4>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
         <button
           onClick={handleContinue}
           disabled={!isController}
@@ -192,7 +175,7 @@ export function TemplateSelectionPage() {
           {!isController && <Loader2 className="h-4 w-4 animate-spin" />}
           {isController
             ? "Continue to Camera ♥"
-            : `Menunggu ${partner?.name} memilih...`}
+            : `Waiting for ${partner?.name} to pick...`}
         </button>
       </div>
     </div>

@@ -56,14 +56,14 @@ export function CameraProvider({ children }: { children: ReactNode }) {
       if (name === "NotAllowedError" || name === "SecurityError") {
         setStatus("denied");
         setErrorMessage(
-          "Akses kamera ditolak. Izinkan kamera di pengaturan browser lalu coba lagi.",
+          "Camera access was blocked. Allow the camera in your browser settings, then try again.",
         );
       } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
         setStatus("error");
-        setErrorMessage("Tidak ada kamera yang terdeteksi di perangkat ini.");
+        setErrorMessage("No camera found on this device.");
       } else {
         setStatus("error");
-        setErrorMessage("Kamera tidak bisa dibuka. Coba tutup aplikasi lain yang memakainya.");
+        setErrorMessage("The camera could not start. Try closing other apps that might be using it.");
       }
     }
   }, []);
@@ -130,6 +130,6 @@ export function CameraProvider({ children }: { children: ReactNode }) {
 
 export function useCamera(): CameraValue {
   const ctx = useContext(CameraContext);
-  if (!ctx) throw new Error("useCamera harus dipakai di dalam CameraProvider");
+  if (!ctx) throw new Error("useCamera must be used inside CameraProvider");
   return ctx;
 }

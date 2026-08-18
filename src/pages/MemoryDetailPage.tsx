@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MoodBadge } from "@/components/MoodBadge";
-import { MemoryFrame } from "@/components/frames/MemoryFrame";
 import { PEOPLE } from "@/config/couple";
 import { useSession } from "@/context/SessionContext";
 import { downloadImage } from "@/lib/compose";
@@ -114,12 +113,12 @@ export function MemoryDetailPage() {
     return (
       <div className="bg-background min-h-[calc(100vh-64px)] p-8 text-center">
         <div className="mb-4 text-6xl">🔍</div>
-        <p className="text-muted-foreground mb-6">Memory tidak ditemukan.</p>
+        <p className="text-muted-foreground mb-6">This memory could not be found.</p>
         <button
           onClick={() => navigate("/gallery")}
           className="bg-primary rounded-2xl px-6 py-3 text-sm font-semibold text-white"
         >
-          Kembali ke Gallery
+          Back to Gallery
         </button>
       </div>
     );
@@ -141,37 +140,17 @@ export function MemoryDetailPage() {
         <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-2">
           <div>
             <div className="flex justify-center">
-              {memory.photos.length > 0 ? (
-                <MemoryFrame
-                  template={memory.template}
-                  photos={memory.photos}
-                  caption={`${PEOPLE.adriel.name} & ${PEOPLE.maria.name} ♥ ${dateLabel}`}
-                />
-              ) : (
-                <div
-                  className="bg-white shadow-2xl"
-                  style={{ padding: "14px 14px 56px 14px", maxWidth: "320px" }}
-                >
-                  <img
-                    src={memory.img}
-                    alt={memory.caption}
-                    className="bg-accent w-full object-cover"
-                    style={{ aspectRatio: "3/4" }}
-                  />
-                  <p
-                    className="mt-1 text-center text-gray-400"
-                    style={{ fontFamily: "Georgia, serif", fontSize: "10px" }}
-                  >
-                    {dateLabel} ♥
-                  </p>
-                </div>
-              )}
+              <img
+                src={memory.img}
+                alt={memory.caption}
+                className="bg-accent max-h-[70vh] w-auto rounded-sm shadow-2xl"
+              />
             </div>
 
             {siblings.length > 0 && (
               <div className="mt-6">
                 <p className="text-muted-foreground mb-3 text-center text-xs font-medium">
-                  Dari sesi yang sama
+                  From the same session
                 </p>
                 <div className="flex flex-wrap justify-center gap-4">
                   {siblings.map((s) => (
@@ -248,7 +227,7 @@ export function MemoryDetailPage() {
               <div ref={listRef} className="max-h-72 space-y-3 overflow-y-auto pr-1">
                 {reactions.length === 0 && (
                   <p className="text-muted-foreground py-6 text-center text-xs">
-                    Belum ada reaction. Tulis yang pertama ♥
+                    No reactions yet. Be the first ♥
                   </p>
                 )}
                 {reactions.map((msg) => {
@@ -292,7 +271,7 @@ export function MemoryDetailPage() {
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Tulis reaction..."
+                  placeholder="Write a reaction..."
                   maxLength={200}
                   className="border-border bg-background focus:ring-primary/30 placeholder:text-muted-foreground/40 min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs focus:ring-2 focus:outline-none"
                 />

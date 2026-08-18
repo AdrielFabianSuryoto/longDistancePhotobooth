@@ -67,11 +67,11 @@ src/
   lib/supabase.ts        client Supabase
   lib/memories.ts        upload foto + baca/tulis tabel memories
   lib/reactions.ts       chat + langganan realtime
-  lib/compose.ts         menggambar frame ke canvas + download
+  lib/compose.ts         satu-satunya penggambar frame (hasil + pratinjau)
+  lib/skins.ts           template bertema pink & aqua
   lib/types.ts           tipe Memory, Reaction, Template, Mood
   context/RoomContext    presence (sinkron langkah) + signaling WebRTC
   context/               SessionContext (auth) + CameraContext (stream)
-  components/frames/     versi React dari frame, sejajar dengan compose.ts
   pages/                 satu file per halaman
   styles/theme.css       design token dari Figma
 supabase/schema.sql      skema + RLS + bucket
@@ -117,6 +117,26 @@ Tanpa server TURN, sambungan bisa gagal di jaringan tertentu (kantor, kampus,
 sebagian jaringan seluler). Kalau itu terjadi, panel status akan menampilkan
 "Sambungan video gagal" — flow foto tetap jalan, hanya preview pasangan yang
 kosong.
+
+## Template
+
+Sembilan pilihan, dikelompokkan per tema di halaman Choose your frame.
+
+| Tema | Template |
+| --- | --- |
+| Pink | Sweet Strip, Bubble Pop, Love Note |
+| Aqua Blue | Fresh Wave, Soda Pop, Ocean Tape |
+| Klasik | Polaroid Classic, Film Strip, Retro Booth |
+
+Enam template bertema memakai susunan **dua kolom** — dengan pilihan 4 foto
+hasilnya grid 2×2, penuh sampai tepi kanvas tanpa margin putih. Definisinya
+ada di [`src/lib/skins.ts`](src/lib/skins.ts): latar, bingkai slot, hiasan, dan
+posisi teks masing-masing berdiri sendiri, jadi menambah template baru cukup
+menambah satu objek di sana.
+
+Frame digambar hanya di satu tempat ([`src/lib/compose.ts`](src/lib/compose.ts)).
+Kartu pilihan template memanggil kode yang sama dengan slot dibiarkan kosong,
+jadi pratinjaunya tidak mungkin berbeda dari hasil jadinya.
 
 ## Belum ada
 

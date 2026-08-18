@@ -116,7 +116,7 @@ export function EmailPreviewPage() {
         </div>
 
         <p className="text-muted-foreground mt-6 text-center text-xs">
-          Tampilan pratinjau saja — pengiriman email asli menyusul bersama backend.
+          Preview only — real email sending comes later.
         </p>
       </div>
     </div>

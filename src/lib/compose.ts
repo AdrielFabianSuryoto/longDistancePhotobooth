@@ -1,8 +1,11 @@
 /**
- * Menggambar ulang frame (polaroid / film / retro) ke <canvas> lalu
- * mengembalikan data URL. Dipakai untuk "Save Memory" dan "Download".
- * Ukuran di bawah memakai satuan desain (CSS px) lalu dikalikan SCALE.
+ * Menggambar frame ke <canvas> lalu mengembalikan data URL.
+ *
+ * Ini satu-satunya tempat frame digambar — dipakai untuk "Save Memory",
+ * "Download", tampilan di layar, maupun pratinjau kartu pilihan template.
+ * Ukuran memakai satuan desain (CSS px) lalu dikalikan SCALE.
  */
+import { SKINS, isSkinId, type Skin, type SlotRect } from "@/lib/skins";
 import type { TemplateId } from "@/lib/types";
 
 const SCALE = 4;
@@ -20,15 +23,19 @@ export const PALETTE = {
 
 /**
  * Tiap jepretan berisi dua potret 3:4 berdampingan (kamu di kiri, pasangan di
- * kanan), jadi satu sel selalu 3:2. Frame-nya berupa satu kolom memanjang,
- * satu baris per jepretan.
+ * kanan), jadi satu slot selalu 3:2.
  */
 export const PAIR_ASPECT = 3 / 2;
 
+/**
+ * Template asli dari desain Figma: satu kolom memanjang.
+ * Sisi kiri-kanan sengaja dilebarkan supaya foto tidak terlihat menempel
+ * ke tepi bingkai seperti terpotong.
+ */
 export const LAYOUT = {
-  polaroid: { frameW: 260, padX: 12, padTop: 12, padBottom: 44, gap: 4 },
-  film: { frameW: 150, padX: 9, padY: 10, gap: 4, holeGap: 6 },
-  retro: { frameW: 240, pad: 10, gap: 5, footerH: 32 },
+  polaroid: { frameW: 260, padX: 20, padTop: 20, padBottom: 46, gap: 6 },
+  film: { frameW: 160, padX: 18, padY: 12, gap: 6, holeGap: 7 },
+  retro: { frameW: 240, pad: 18, gap: 7, footerH: 34 },
 };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -36,7 +43,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     const img = new Image();
     if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Gagal memuat gambar: ${src.slice(0, 40)}`));
+    img.onerror = () => reject(new Error(`Could not load image: ${src.slice(0, 40)}`));
     img.src = src;
   });
 }
@@ -64,11 +71,35 @@ function roundRect(
   y: number,
   w: number,
   h: number,
-  r: number,
+  r: number | number[],
 ) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
   ctx.fill();
+}
+
+function setup(canvas: HTMLCanvasElement, w: number, h: number) {
+  canvas.width = Math.round(w * SCALE);
+  canvas.height = Math.round(h * SCALE);
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(SCALE, SCALE);
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = PALETTE.backdrop;
+  ctx.fillRect(0, 0, w, h);
+  return ctx;
+}
+
+function render(
+  canvas: HTMLCanvasElement,
+  template: TemplateId,
+  images: HTMLImageElement[],
+  caption: string,
+  slotCount: number,
+) {
+  if (isSkinId(template)) drawSkin(canvas, SKINS[template], images, caption, slotCount);
+  else if (template === "film") drawFilm(canvas, images, caption, slotCount);
+  else if (template === "retro") drawRetro(canvas, images, caption, slotCount);
+  else drawPolaroid(canvas, images, caption, slotCount);
 }
 
 export type ComposeOptions = {
@@ -84,46 +115,105 @@ export async function composeMemory({
 }: ComposeOptions): Promise<string> {
   const images = await Promise.all(photos.map(loadImage));
   const canvas = document.createElement("canvas");
-
-  if (template === "film") drawFilm(canvas, images, caption);
-  else if (template === "retro") drawRetro(canvas, images, caption);
-  else drawPolaroid(canvas, images, caption);
-
+  render(canvas, template, images, caption, images.length);
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
-function setup(canvas: HTMLCanvasElement, w: number, h: number) {
-  canvas.width = Math.round(w * SCALE);
-  canvas.height = Math.round(h * SCALE);
-  const ctx = canvas.getContext("2d")!;
-  ctx.scale(SCALE, SCALE);
-  ctx.imageSmoothingQuality = "high";
-  ctx.fillStyle = PALETTE.backdrop;
-  ctx.fillRect(0, 0, w, h);
-  return ctx;
+/**
+ * Template kosong berisi slot placeholder, untuk kartu pilihan template.
+ * Digambar dengan kode yang sama persis dengan hasil akhirnya, jadi
+ * pratinjaunya tidak mungkin berbeda dari yang nanti dihasilkan.
+ */
+export function composeTemplatePreview(template: TemplateId, slots = 4): string {
+  const canvas = document.createElement("canvas");
+  render(canvas, template, [], "Adriel & Maria ♥", slots);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }
+
+/* ── Template bertema (pink / aqua) ───────────────────────────────── */
+
+function drawSkin(
+  canvas: HTMLCanvasElement,
+  skin: Skin,
+  images: HTMLImageElement[],
+  caption: string,
+  slotCount: number,
+) {
+  const cols = 2;
+  const rows = Math.max(1, Math.ceil(slotCount / cols));
+  const cellW = (skin.frameW - skin.padX * 2 - skin.gap) / cols;
+  const cellH = cellW / PAIR_ASPECT;
+  const gapY = skin.gapY ?? skin.gap;
+  const offsets = skin.colOffset ?? [0, 0];
+  const maxOffset = Math.max(offsets[0], offsets[1]);
+  const frameH =
+    skin.padTop + rows * cellH + (rows - 1) * gapY + maxOffset + skin.padBottom;
+
+  const ctx = setup(canvas, skin.frameW, frameH);
+  skin.background(ctx, skin.frameW, frameH);
+
+  const slots: SlotRect[] = [];
+  for (let i = 0; i < slotCount; i++) {
+    const col = i % cols;
+    slots.push({
+      x: skin.padX + col * (cellW + skin.gap),
+      y: skin.padTop + Math.floor(i / cols) * (cellH + gapY) + offsets[col],
+      w: cellW,
+      h: cellH,
+    });
+  }
+
+  slots.forEach((s, i) => {
+    skin.slotFrame?.(ctx, s);
+    ctx.fillStyle = skin.slotEmpty;
+    roundRect(ctx, s.x, s.y, s.w, s.h, skin.slotRadius);
+
+    const img = images[i];
+    if (!img) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(s.x, s.y, s.w, s.h, skin.slotRadius);
+    ctx.clip();
+    drawCover(ctx, img, s.x, s.y, s.w, s.h);
+    ctx.restore();
+  });
+
+  skin.ornament?.(ctx, skin.frameW, frameH, slots);
+
+  ctx.fillStyle = skin.captionColor;
+  ctx.font = skin.captionFont;
+  ctx.textAlign = "center";
+  ctx.fillText(
+    caption,
+    skin.frameW / 2,
+    frameH - skin.captionBaseline,
+    skin.frameW - skin.padX * 2,
+  );
+}
+
+/* ── Template asli dari desain Figma ──────────────────────────────── */
 
 function drawPolaroid(
   canvas: HTMLCanvasElement,
   images: HTMLImageElement[],
   caption: string,
+  slotCount: number,
 ) {
   const L = LAYOUT.polaroid;
   const cellW = L.frameW - L.padX * 2;
   const cellH = cellW / PAIR_ASPECT;
-  const frameH =
-    L.padTop + images.length * cellH + (images.length - 1) * L.gap + L.padBottom;
+  const frameH = L.padTop + slotCount * cellH + (slotCount - 1) * L.gap + L.padBottom;
 
   const ctx = setup(canvas, L.frameW, frameH);
   ctx.fillStyle = PALETTE.paper;
   ctx.fillRect(0, 0, L.frameW, frameH);
 
-  images.forEach((img, i) => {
+  for (let i = 0; i < slotCount; i++) {
     const y = L.padTop + i * (cellH + L.gap);
     ctx.fillStyle = PALETTE.photoBg;
     ctx.fillRect(L.padX, y, cellW, cellH);
-    drawCover(ctx, img, L.padX, y, cellW, cellH);
-  });
+    if (images[i]) drawCover(ctx, images[i], L.padX, y, cellW, cellH);
+  }
 
   ctx.fillStyle = PALETTE.caption;
   ctx.font = "10px Georgia, serif";
@@ -135,14 +225,14 @@ function drawFilm(
   canvas: HTMLCanvasElement,
   images: HTMLImageElement[],
   caption: string,
+  slotCount: number,
 ) {
   const L = LAYOUT.film;
   const cellW = L.frameW - L.padX * 2;
   const cellH = cellW / PAIR_ASPECT;
   const holeRowH = 5;
-  const bodyH = images.length * cellH + (images.length - 1) * L.gap;
-  const frameH =
-    L.padY * 2 + holeRowH * 2 + L.holeGap * 2 + bodyH + 16; /* baris caption */
+  const bodyH = slotCount * cellH + (slotCount - 1) * L.gap;
+  const frameH = L.padY * 2 + holeRowH * 2 + L.holeGap * 2 + bodyH + 16;
 
   const ctx = setup(canvas, L.frameW, frameH);
   ctx.fillStyle = PALETTE.filmBody;
@@ -161,12 +251,12 @@ function drawFilm(
 
   drawHoles(L.padY);
   let y = L.padY + holeRowH + L.holeGap;
-  images.forEach((img) => {
+  for (let i = 0; i < slotCount; i++) {
     ctx.fillStyle = PALETTE.photoBg;
     ctx.fillRect(L.padX, y, cellW, cellH);
-    drawCover(ctx, img, L.padX, y, cellW, cellH);
+    if (images[i]) drawCover(ctx, images[i], L.padX, y, cellW, cellH);
     y += cellH + L.gap;
-  });
+  }
   y = y - L.gap + L.holeGap;
   drawHoles(y);
 
@@ -180,28 +270,29 @@ function drawRetro(
   canvas: HTMLCanvasElement,
   images: HTMLImageElement[],
   caption: string,
+  slotCount: number,
 ) {
   const L = LAYOUT.retro;
   const cellW = L.frameW - L.pad * 2;
   const cellH = cellW / PAIR_ASPECT;
-  const frameH =
-    L.pad * 2 + images.length * cellH + (images.length - 1) * L.gap + L.footerH;
+  const frameH = L.pad * 2 + slotCount * cellH + (slotCount - 1) * L.gap + L.footerH;
 
   const ctx = setup(canvas, L.frameW, frameH);
   ctx.fillStyle = PALETTE.retroBody;
   roundRect(ctx, 0, 0, L.frameW, frameH, 10);
 
-  images.forEach((img, i) => {
+  for (let i = 0; i < slotCount; i++) {
     const y = L.pad + i * (cellH + L.gap);
     ctx.fillStyle = PALETTE.photoBg;
     roundRect(ctx, L.pad, y, cellW, cellH, 3);
+    if (!images[i]) continue;
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(L.pad, y, cellW, cellH, 3);
     ctx.clip();
-    drawCover(ctx, img, L.pad, y, cellW, cellH);
+    drawCover(ctx, images[i], L.pad, y, cellW, cellH);
     ctx.restore();
-  });
+  }
 
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.font = "10px Georgia, serif";
@@ -220,7 +311,7 @@ function triggerDownload(href: string, filename: string) {
   a.remove();
 }
 
-/** Bisa menerima data URL maupun URL remote (mis. foto contoh Unsplash). */
+/** Bisa menerima data URL maupun URL remote. */
 export async function downloadImage(src: string, filename: string) {
   if (src.startsWith("data:")) {
     triggerDownload(src, filename);

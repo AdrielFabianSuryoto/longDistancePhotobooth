@@ -81,7 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Cek tanggal lahir di sisi browser — lapisan personal, bukan pengaman.
       // Yang benar-benar mengamankan adalah password (secret code) di Supabase.
       if (birthday !== person.birthday) {
-        throw new Error("Tanggal lahirnya belum cocok. Coba cek lagi ya 🌸");
+        throw new Error("That birthday does not match. Give it another try 🌸");
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -92,12 +92,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!error) return;
       if (error.message.toLowerCase().includes("email not confirmed")) {
         throw new Error(
-          `Akun ${person.name} belum dikonfirmasi. Buka Supabase → Authentication → Users, lalu konfirmasi emailnya.`,
+          `${person.name}'s account is not confirmed yet. Open Supabase → Authentication → Users and confirm the email.`,
         );
       }
       if (error.message.toLowerCase().includes("invalid login credentials")) {
         throw new Error(
-          `Secret code belum tepat, atau akun ${person.name} (${person.email}) belum dibuat di Supabase.`,
+          `Wrong secret code, or ${person.name} (${person.email}) has no account in Supabase yet.`,
         );
       }
       throw new Error(error.message);
@@ -153,6 +153,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 export function useSession(): SessionValue {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error("useSession harus dipakai di dalam SessionProvider");
+  if (!ctx) throw new Error("useSession must be used inside SessionProvider");
   return ctx;
 }

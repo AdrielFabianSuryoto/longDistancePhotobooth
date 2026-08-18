@@ -53,7 +53,7 @@ export function GalleryPage() {
             </h2>
             <p className="text-muted-foreground mt-1 text-sm">
               {loading
-                ? "Memuat..."
+                ? "Loading..."
                 : `${bySession.length} ${bySession.length === 1 ? "memory" : "memories"} together`}
             </p>
           </div>
@@ -88,7 +88,7 @@ export function GalleryPage() {
         {error && (
           <div className="text-destructive mb-6 flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Gagal memuat memory: {error}</span>
+            <span>Could not load memories: {error}</span>
           </div>
         )}
 
@@ -149,17 +149,17 @@ export function GalleryPage() {
           <div className="py-20 text-center">
             <div className="mb-4 text-6xl">🌸</div>
             <h3 className="text-foreground font-display mb-2 text-lg font-bold">
-              Belum ada memory
+              No memories yet
             </h3>
             <p className="text-muted-foreground mx-auto mb-7 max-w-sm text-sm">
-              Mulai sesi photobooth pertama kalian — hasilnya akan muncul di sini.
+              Start your first photobooth session together — it will show up here.
             </p>
             <button
               onClick={() => navigate("/connect")}
               className="bg-primary font-display inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
             >
               <Camera className="h-4 w-4" />
-              Mulai Sesi ♥
+              Start a Session ♥
             </button>
           </div>
         )}

@@ -109,7 +109,7 @@ export type NewMemory = {
 export async function createMemory(input: NewMemory): Promise<Memory> {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
-  if (!userId) throw new Error("Belum login.");
+  if (!userId) throw new Error("You are not signed in.");
 
   const id = crypto.randomUUID();
   const folder = `${userId}/${id}`;

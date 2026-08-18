@@ -28,7 +28,7 @@ export function VerificationPage() {
       await signIn(userId, birthday, code);
       navigate("/connect");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal masuk.");
+      setError(err instanceof Error ? err.message : "Could not sign in.");
     } finally {
       setBusy(false);
     }
@@ -112,7 +112,7 @@ export function VerificationPage() {
             className="bg-primary font-display mt-6 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 disabled:opacity-70"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {busy ? "Membuka..." : "Enter Our Space ♥"}
+            {busy ? "Opening..." : "Enter Our Space ♥"}
           </button>
           <p className="text-muted-foreground mt-4 text-center text-xs">
             Private. Only you and {partner.name} can enter.

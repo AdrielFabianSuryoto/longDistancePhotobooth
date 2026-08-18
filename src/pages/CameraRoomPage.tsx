@@ -142,12 +142,12 @@ export function CameraRoomPage() {
 
   const connectionLabel =
     callStatus === "connected"
-      ? "Video tersambung"
+      ? "Video connected"
       : callStatus === "failed"
-        ? "Sambungan video gagal"
+        ? "Video connection failed"
         : partnerHere && partnerInCall
-          ? "Menghubungkan video..."
-          : `Menunggu ${partner.name}`;
+          ? "Connecting video..."
+          : `Waiting for ${partner.name}`;
 
   return (
     <div className="bg-background flex min-h-[calc(100vh-64px)] flex-col gap-5 p-4 sm:p-6 lg:flex-row">
@@ -170,7 +170,7 @@ export function CameraRoomPage() {
                 </div>
                 <p className="text-sm text-white/60">
                   {status === "requesting"
-                    ? "Menyalakan kamera..."
+                    ? "Waking up the camera..."
                     : (errorMessage ?? "Camera preview")}
                 </p>
                 {(status === "denied" || status === "error") && (
@@ -178,7 +178,7 @@ export function CameraRoomPage() {
                     onClick={() => void start()}
                     className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
                   >
-                    Coba lagi
+                    Try again
                   </button>
                 )}
               </>
@@ -201,10 +201,10 @@ export function CameraRoomPage() {
                 </div>
                 <p className="text-sm text-white/60">
                   {callStatus === "failed"
-                    ? "Video gagal tersambung. Coba muat ulang halaman."
+                    ? "Video could not connect. Try reloading the page."
                     : partnerHere
-                      ? `Menghubungkan ke kamera ${partner.name}...`
-                      : `Menunggu ${partner.name} masuk ke camera room`}
+                      ? `Connecting to ${partner.name}'s camera...`
+                      : `Waiting for ${partner.name} to join the camera room`}
                 </p>
               </>
             }
@@ -300,16 +300,16 @@ export function CameraRoomPage() {
                 : "bg-muted text-muted-foreground cursor-not-allowed"
             }`}
           >
-            {isController ? "Start Capture ♥" : `Menunggu ${controllerName}...`}
+            {isController ? "Start Capture ♥" : `Waiting for ${controllerName}...`}
           </button>
           <p className="text-muted-foreground mt-2 text-center text-xs">
             {!isController
-              ? `${controllerName} yang memulai foto`
+              ? `${controllerName} starts the photos`
               : !cameraLive
-                ? "Menunggu izin kamera"
+                ? "Waiting for camera permission"
                 : !partnerInCall
-                  ? `Menunggu kamera ${partner.name}`
-                  : "Kalian berdua siap"}
+                  ? `Waiting for ${partner.name}'s camera`
+                  : "You are both ready"}
           </p>
         </div>
       </div>

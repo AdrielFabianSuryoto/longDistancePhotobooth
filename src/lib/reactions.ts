@@ -33,7 +33,7 @@ export async function addReaction(
 ): Promise<Reaction> {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
-  if (!userId) throw new Error("Belum login.");
+  if (!userId) throw new Error("You are not signed in.");
 
   const { data, error } = await supabase
     .from("reactions")

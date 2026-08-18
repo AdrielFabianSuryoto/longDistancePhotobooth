@@ -5,9 +5,9 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!url || !anonKey) {
   throw new Error(
-    "VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY belum diisi. " +
-      "Salin .env.example jadi .env.local lalu isi dari Supabase Dashboard, " +
-      "dan restart `npm run dev`.",
+    "VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. " +
+      "Copy .env.example to .env.local, fill it in from the Supabase Dashboard, " +
+      "then restart `npm run dev`.",
   );
 }
 

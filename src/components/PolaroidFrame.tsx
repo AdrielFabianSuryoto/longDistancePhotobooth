@@ -5,11 +5,14 @@ export function PolaroidFrame({
   caption,
   rotate = 0,
   size = "md",
+  mirrored = false,
 }: {
   src: string;
   caption?: string;
   rotate?: number;
   size?: keyof typeof WIDTHS;
+  /** balik gambar secara horizontal; caption dan rotasi tidak ikut terbalik */
+  mirrored?: boolean;
 }) {
   return (
     <div
@@ -20,6 +23,7 @@ export function PolaroidFrame({
         src={src}
         alt="memory"
         className="bg-accent aspect-square w-full object-cover"
+        style={mirrored ? { transform: "scaleX(-1)" } : undefined}
       />
       {caption && (
         <p

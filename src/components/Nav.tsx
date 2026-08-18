@@ -53,7 +53,7 @@ export function Nav() {
               onClick={() => {
                 void signOut().then(() => navigate("/"));
               }}
-              title="Keluar / ganti pengguna"
+              title="Sign out / switch person"
               className="bg-accent hover:bg-accent/70 flex items-center gap-2 rounded-full px-3 py-2 transition-colors sm:px-4"
             >
               <div className="bg-primary flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white">

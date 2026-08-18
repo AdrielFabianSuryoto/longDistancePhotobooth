@@ -99,7 +99,7 @@ export function CountdownPage() {
           />
           {!remoteStream && (
             <div className="bg-accent/10 absolute inset-0 flex items-center justify-center text-sm text-white/40">
-              {partner?.name} belum tersambung
+              {partner?.name} is not connected yet
             </div>
           )}
           <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-2.5 py-0.5 text-[10px] font-medium text-white/80">

@@ -393,6 +393,6 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
 export function useRoom(): RoomValue {
   const ctx = useContext(RoomContext);
-  if (!ctx) throw new Error("useRoom harus dipakai di dalam RoomProvider");
+  if (!ctx) throw new Error("useRoom must be used inside RoomProvider");
   return ctx;
 }

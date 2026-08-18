@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { FloatingHearts } from "@/components/FloatingHearts";
-import { MemoryFrame } from "@/components/frames/MemoryFrame";
 import { PEOPLE } from "@/config/couple";
 import { useCamera } from "@/context/CameraContext";
 import { useRoom } from "@/context/RoomContext";
@@ -50,7 +49,7 @@ export function PhotoPreviewPage() {
     let alive = true;
     composeMemory({ template, photos, caption: frameCaption })
       .then((url) => alive && setComposed(url))
-      .catch(() => alive && setError("Gagal menyusun frame foto."));
+      .catch(() => alive && setError("Could not put the frame together."));
     return () => {
       alive = false;
     };
@@ -78,8 +77,8 @@ export function PhotoPreviewPage() {
     } catch (err) {
       setError(
         err instanceof Error
-          ? `Gagal menyimpan: ${err.message}`
-          : "Gagal menyimpan memory.",
+          ? `Could not save: ${err.message}`
+          : "Could not save this memory.",
       );
     } finally {
       setSaving(false);
@@ -106,7 +105,17 @@ export function PhotoPreviewPage() {
 
         <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-start lg:justify-center lg:gap-14">
           <div className="flex flex-col items-center gap-3">
-            <MemoryFrame template={template} photos={photos} caption={frameCaption} />
+            {composed ? (
+              <img
+                src={composed}
+                alt="Your finished frame"
+                className="max-h-[70vh] w-auto rounded-sm shadow-2xl"
+              />
+            ) : (
+              <div className="bg-muted text-muted-foreground flex h-80 w-56 items-center justify-center rounded-sm">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            )}
             <p className="text-muted-foreground text-xs font-medium">
               {templateName(template)} · {photos.length} photos
             </p>
@@ -124,7 +133,7 @@ export function PhotoPreviewPage() {
                 id="caption"
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Tulis sesuatu tentang momen ini..."
+                placeholder="Say something about this moment..."
                 maxLength={80}
                 className="border-border bg-background focus:ring-primary/30 placeholder:text-muted-foreground/40 w-full rounded-xl border px-3 py-2.5 text-sm transition-all focus:ring-2 focus:outline-none"
               />
@@ -169,7 +178,7 @@ export function PhotoPreviewPage() {
               ) : (
                 <Heart className="h-4 w-4" />
               )}
-              {saving ? "Mengunggah..." : saved ? "Saved to Gallery!" : "Save Memory"}
+              {saving ? "Uploading..." : saved ? "Saved to Gallery!" : "Save Memory"}
             </button>
 
             <button

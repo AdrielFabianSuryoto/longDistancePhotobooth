@@ -3,6 +3,9 @@ import { ChevronRight, Heart, Lock, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { FloatingHearts } from "@/components/FloatingHearts";
 import { PolaroidFrame } from "@/components/PolaroidFrame";
+import photoAnniversary from "@/images/3.jpg.jpeg";
+import photoForever from "@/images/2.jpg.jpeg";
+import photoUsAlways from "@/images/1.jpg.jpeg";
 import { APP_NAME, PEOPLE, type UserId } from "@/config/couple";
 
 const FOOTER_ITEMS = [
@@ -37,7 +40,7 @@ export function LandingPage() {
         <div className="relative z-10 flex-1">
           <div className="bg-accent mb-6 inline-flex items-center gap-2 rounded-full px-4 py-2 shadow-sm">
             <span className="text-primary text-xs font-semibold">
-              ✦ Made just for the two of you
+              ✦ Made just for the two of us
             </span>
           </div>
           <h1 className="text-foreground font-display mb-6 text-4xl leading-[1.15] font-bold sm:text-5xl lg:text-6xl">
@@ -49,7 +52,7 @@ export function LandingPage() {
           </h1>
           <p className="text-muted-foreground mb-10 max-w-md text-base leading-relaxed sm:text-lg">
             A private space for {PEOPLE.adriel.name} and {PEOPLE.maria.name} to
-            capture shared moments, build a timeline of love, and feel close —
+            capture shared moments, build a timeline of love, and feel close -
             even from miles apart.
           </p>
           <div className="flex flex-wrap gap-4">
@@ -81,15 +84,16 @@ export function LandingPage() {
             <div className="bg-accent/50 absolute inset-8 rounded-full blur-2xl" />
             <div className="absolute top-2 right-0">
               <PolaroidFrame
-                src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=200&h=200&fit=crop"
-                caption="June 14 ♥"
+                src={photoAnniversary}
+                caption="July 24 ♥"
                 rotate={6}
                 size="sm"
+                mirrored
               />
             </div>
             <div className="absolute bottom-4 left-0">
               <PolaroidFrame
-                src="https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=200&h=200&fit=crop"
+                src={photoForever}
                 caption="always & forever"
                 rotate={-7}
                 size="sm"
@@ -97,7 +101,7 @@ export function LandingPage() {
             </div>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
               <PolaroidFrame
-                src="https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=200&h=200&fit=crop"
+                src={photoUsAlways}
                 caption="us, always 🌸"
                 rotate={2}
                 size="md"
