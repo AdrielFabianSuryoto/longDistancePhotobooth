@@ -69,6 +69,7 @@ export function CameraRoomPage() {
     setStage,
     startCapture,
     startCall,
+    retryCall,
   } = useRoom();
   const navigate = useNavigate();
   /** sedang transisi ke countdown */
@@ -155,7 +156,7 @@ export function CameraRoomPage() {
         <div className="flex flex-1 flex-col gap-4 sm:flex-row">
           <CameraTile
             stream={cameraLive ? stream : null}
-            label={`${me.name} (kamu)`}
+            label={`${me.name} (you)`}
             mirrored
             fallback={
               <>
@@ -201,11 +202,19 @@ export function CameraRoomPage() {
                 </div>
                 <p className="text-sm text-white/60">
                   {callStatus === "failed"
-                    ? "Video could not connect. Try reloading the page."
+                    ? "Video could not connect. This usually means a network is blocking the direct link."
                     : partnerHere
                       ? `Connecting to ${partner.name}'s camera...`
                       : `Waiting for ${partner.name} to join the camera room`}
                 </p>
+                {partnerHere && callStatus !== "connected" && (
+                  <button
+                    onClick={retryCall}
+                    className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                  >
+                    Try reconnecting
+                  </button>
+                )}
               </>
             }
           />

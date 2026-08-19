@@ -23,10 +23,12 @@ import { MOODS, templateName, type Mood } from "@/lib/types";
 export function PhotoPreviewPage() {
   const { template, photos, setPhotos, setLastMemoryId } = useSession();
   const { stop } = useCamera();
-  const { captureId, endCall } = useRoom();
+  const { captureId, captureDate, endCall } = useRoom();
   const navigate = useNavigate();
   /** dikunci sekali: id capture bersama, supaya foto keduanya jadi satu memory */
   const [sessionId] = useState<string | null>(captureId);
+  /** tanggal dari controller; kedua perangkat memakai yang sama persis */
+  const [sessionDate] = useState<string | null>(captureDate);
 
   const [composed, setComposed] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
@@ -36,7 +38,8 @@ export function PhotoPreviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   const today = new Date();
-  const frameCaption = `${PEOPLE.adriel.name} & ${PEOPLE.maria.name} ♥ ${today.toLocaleDateString()}`;
+  const stampedDate = sessionDate ?? formatDate(today.toISOString());
+  const frameCaption = `${PEOPLE.adriel.name} & ${PEOPLE.maria.name} ♥ ${stampedDate}`;
 
   // Sesi selesai: matikan kamera dan tutup sambungan video ke pasangan.
   useEffect(() => {

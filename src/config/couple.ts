@@ -38,6 +38,13 @@ export const PEOPLE: Record<UserId, Person> = {
 /** Kode rahasia bersama untuk masuk ke ruang privat. */
 export const SECRET_CODE = "24Juli2026";
 
+/**
+ * Semua tanggal & jam ditampilkan dalam zona waktu ini, bukan zona waktu
+ * masing-masing perangkat — supaya kalian berdua selalu melihat angka yang
+ * sama untuk memory yang sama, walau sedang berbeda zona waktu.
+ */
+export const DISPLAY_TIME_ZONE = "Asia/Jakarta";
+
 export const APP_NAME = "Our Long Distance Photobooth";
 export const APP_SHORT_NAME = "Our Booth";
 export const SENDER_EMAIL = "hello@ourbooth.love";

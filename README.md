@@ -112,11 +112,24 @@ yang sama, sehingga Gallery menampilkannya sebagai satu memory dan halaman
 detail memperlihatkan frame keduanya. Isi frame keduanya sama; yang berbeda
 hanya sisi mana yang tajam (kamera lokal) dan mana yang dari stream video.
 
-Video pasangan memakai koneksi peer-to-peer langsung dengan STUN publik Google.
-Tanpa server TURN, sambungan bisa gagal di jaringan tertentu (kantor, kampus,
-sebagian jaringan seluler). Kalau itu terjadi, panel status akan menampilkan
-"Sambungan video gagal" — flow foto tetap jalan, hanya preview pasangan yang
-kosong.
+**Video pasangan & TURN.** Memakai koneksi peer-to-peer langsung (WebRTC) dengan
+STUN publik Google secara default. STUN saja hanya berhasil kalau jaringan
+kedua perangkat sama-sama mengizinkan jalur langsung ditemukan (umum di WiFi
+rumah) — di data seluler, NAT simetris, atau firewall kantor/kampus yang
+ketat, sambungannya akan macet di "Connecting..." selamanya. Kalau itu terjadi
+berulang, isi tiga variabel `VITE_TURN_*` di `.env.local` (lihat
+`.env.example`) dengan relay TURN — mis. tingkat gratis dari
+[Metered](https://www.metered.ca/tools/openrelay/), atau server coturn
+sendiri. Tanpa TURN, flow foto tetap jalan, hanya preview pasangan yang kosong;
+tombol "Try reconnecting" (muncul di sisi mana pun) dan `retryCall()` bisa
+dipakai untuk mencoba lagi tanpa memuat ulang halaman.
+
+**Channel yang pulih sendiri.** Kalau tab dilatarbelakangi lama (layar HP
+terkunci, pindah aplikasi) dan sistem memutus socket-nya paksa, channel
+presence bisa mati sementara halamannya tetap terbuka. `RoomContext.tsx`
+mendeteksi ini lewat status `subscribe()` (`CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`)
+maupun lewat event `visibilitychange` saat tab terlihat lagi, lalu membuat
+channel baru secara otomatis — tanpa perlu reload.
 
 ## Template
 

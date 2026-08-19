@@ -24,6 +24,7 @@ import {
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { UserId } from "@/config/couple";
 import { useSession } from "@/context/SessionContext";
+import { formatDate } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import type { PhotoCount, TemplateId } from "@/lib/types";
 
@@ -35,10 +36,33 @@ const OFFERER: UserId = "adriel";
 /** Kalau keduanya menekan Start Session nyaris bersamaan, ini yang menang. */
 const CONTROL_TIEBREAK: UserId = "adriel";
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-];
+/**
+ * STUN alone only works when both devices' networks allow a direct path to
+ * be discovered (most home Wi-Fi). It fails on carrier-grade NAT (common on
+ * mobile data), symmetric NAT, and strict office/campus firewalls — the
+ * connection just sits at "connecting" forever. A TURN relay is the only
+ * fix for that; it's opt-in via env vars so the app still works with STUN
+ * only when none is configured.
+ */
+function buildIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+
+  const turnUrl = import.meta.env.VITE_TURN_URL;
+  if (turnUrl) {
+    servers.push({
+      urls: turnUrl,
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    });
+  }
+
+  return servers;
+}
+
+const ICE_SERVERS = buildIceServers();
 
 export type Stage = "waiting" | "templates" | "camera" | "countdown";
 export type CallStatus = "idle" | "connecting" | "connected" | "failed";
@@ -52,6 +76,8 @@ type PresencePayload = {
   template: TemplateId;
   count: PhotoCount;
   captureId: string | null;
+  /** tanggal sesi menurut controller, supaya frame keduanya bertuliskan sama */
+  captureDate: string | null;
   /** waktu update terakhir — dipakai memilih entri presence paling baru */
   ts: number;
 };
@@ -59,7 +85,9 @@ type PresencePayload = {
 type Signal =
   | { type: "offer"; sdp: RTCSessionDescriptionInit }
   | { type: "answer"; sdp: RTCSessionDescriptionInit }
-  | { type: "ice"; candidate: RTCIceCandidateInit };
+  | { type: "ice"; candidate: RTCIceCandidateInit }
+  /** participant meminta controller mengulang koneksi video dari awal */
+  | { type: "restart" };
 
 type RoomValue = {
   partnerOnline: boolean;
@@ -73,6 +101,8 @@ type RoomValue = {
   sharedCount: PhotoCount;
   /** id capture bersama, dipakai supaya foto keduanya jadi satu memory */
   captureId: string | null;
+  /** tanggal sesi dari controller; dipakai kedua perangkat untuk caption frame */
+  captureDate: string | null;
   remoteStream: MediaStream | null;
   callStatus: CallStatus;
 
@@ -83,6 +113,8 @@ type RoomValue = {
   startCapture: () => string;
   startCall: (local: MediaStream) => void;
   endCall: () => void;
+  /** coba sambungkan ulang video secara manual — bisa dipicu dari kedua sisi */
+  retryCall: () => void;
 };
 
 const RoomContext = createContext<RoomValue | null>(null);
@@ -94,10 +126,27 @@ const BLANK: Omit<PresencePayload, "user" | "ts"> = {
   template: "polaroid",
   count: 4,
   captureId: null,
+  captureDate: null,
 };
 
 /** Jeda penggabungan sebelum presence dikirim, dalam milidetik. */
 const TRACK_DEBOUNCE = 80;
+
+/**
+ * Presence dikirim ulang berkala. Supabase hanya mengirim selisih sekali; kalau
+ * satu paket hilang (jaringan seluler, socket sempat tidur), pandangan salah
+ * satu pihak akan basi selamanya. Denyut ini membuatnya pulih sendiri.
+ */
+const PRESENCE_HEARTBEAT_MS = 5000;
+
+/**
+ * Offer dikirim lewat broadcast yang tanpa jaminan sampai, jadi perlu diulang.
+ * Jaraknya sengaja longgar: ICE checks lintas jaringan sungguhan (bukan satu
+ * WiFi) bisa makan waktu 10 detik lebih, dan mengulang terlalu cepat cuma
+ * membatalkan percobaan yang sebenarnya masih berjalan.
+ */
+const OFFER_RETRY_MS = 12000;
+const MAX_OFFER_ATTEMPTS = 5;
 
 export function RoomProvider({ children }: { children: ReactNode }) {
   const { user } = useSession();
@@ -108,6 +157,12 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [callStatus, setCallStatus] = useState<CallStatus>("idle");
   /** state, bukan ref, supaya efek negosiasi ikut jalan saat kamera lokal siap */
   const [localReady, setLocalReady] = useState(false);
+  /** dinaikkan untuk memaksa offer dibuat ulang saat sambungan tak kunjung jadi */
+  const [offerAttempt, setOfferAttempt] = useState(0);
+  /** dinaikkan saat retryCall() dipanggil, supaya klik tetap berefek walau offerAttempt kebetulan tidak berubah */
+  const [manualRetry, setManualRetry] = useState(0);
+  /** dinaikkan untuk memaksa channel presence dibuat ulang setelah mati sendiri */
+  const [channelEpoch, setChannelEpoch] = useState(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   /** channel yang sedang hidup, supaya tidak dibuat dua kali */
@@ -118,8 +173,18 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const localRef = useRef<MediaStream | null>(null);
   const pendingIce = useRef<RTCIceCandidateInit[]>([]);
   const negotiating = useRef(false);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Jeda singkat sebelum sambung ulang, supaya kegagalan beruntun tidak jadi loop rapat. */
+  const scheduleReconnect = useCallback(() => {
+    if (reconnectTimer.current) return;
+    reconnectTimer.current = setTimeout(() => {
+      reconnectTimer.current = null;
+      setChannelEpoch((n) => n + 1);
+    }, 1500);
+  }, []);
 
   /**
    * Perubahan digabung dulu sebelum dikirim. Memanggil track() dua kali
@@ -189,6 +254,22 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
   const handleSignal = useCallback(
     async (signal: Signal) => {
+      // Participant meminta koneksi diulang — hanya controller (OFFERER)
+      // yang boleh menanggapi, supaya offer baru tetap datang dari satu arah.
+      if (signal.type === "restart") {
+        if (user === OFFERER) {
+          closePeer();
+          setOfferAttempt(0);
+          setManualRetry((n) => n + 1);
+        }
+        return;
+      }
+
+      // Offer ulang berarti pihak sana memulai dari nol; peer lama harus
+      // dibuang, kalau tidak setRemoteDescription akan ditolak.
+      if (signal.type === "offer" && pcRef.current?.currentRemoteDescription) {
+        closePeer();
+      }
       const pc = ensurePeer();
       try {
         if (signal.type === "offer") {
@@ -212,7 +293,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         setCallStatus("failed");
       }
     },
-    [drainIce, ensurePeer, send],
+    [closePeer, drainIce, ensurePeer, send, user],
   );
 
   useEffect(() => {
@@ -223,7 +304,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   // Sengaja tanpa cleanup: React StrictMode menjalankan efek dua kali di dev,
   // dan dua channel dengan topik sama pada satu client saling menelan
   // presence-nya. Jadi channel dibuat sekali dan hanya dibongkar saat user
-  // berganti atau logout.
+  // berganti, logout, atau saat channelEpoch dinaikkan untuk memaksa
+  // sambung ulang (lihat di bawah).
   useEffect(() => {
     if (!user) {
       if (activeRef.current) {
@@ -243,7 +325,15 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       activeRef.current = null;
     }
 
-    const initial: PresencePayload = { user, ...BLANK, ts: Date.now() };
+    // Kalau tetap dari sesi sebelumnya (bukan login baru), pertahankan
+    // payload lama alih-alih menimpanya ke BLANK — supaya sambung ulang
+    // setelah channel mati tidak membuang stage/template/inCall yang sedang
+    // berjalan.
+    const initial: PresencePayload = mineRef.current ?? {
+      user,
+      ...BLANK,
+      ts: Date.now(),
+    };
     mineRef.current = initial;
     setMine(initial);
 
@@ -273,11 +363,56 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED" && mineRef.current) {
         void channel.track(mineRef.current);
+        return;
+      }
+      // Channel bisa mati sendiri — socket putus (HP dikunci/aplikasi
+      // dilatarbelakangi), jaringan sempat hilang, dsb. Tanpa penanganan ini,
+      // activeRef tetap menunjuk channel yang sudah mati selamanya dan
+      // presence pasangan tidak akan pernah tersambung lagi walau komponennya
+      // masih hidup. Bersihkan referensinya dan minta sambung ulang.
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        if (activeRef.current?.channel === channel) {
+          activeRef.current = null;
+          channelRef.current = null;
+          scheduleReconnect();
+        }
       }
     });
 
     channelRef.current = channel;
     activeRef.current = { user, channel };
+  }, [user, channelEpoch, scheduleReconnect]);
+
+  // Kalau tab sempat dilatarbelakangi (layar HP terkunci, pindah aplikasi)
+  // dan socket-nya diputus paksa oleh sistem, browser tidak selalu memberi
+  // tahu channel-nya lewat callback subscribe di atas. Saat tab terlihat
+  // lagi, periksa langsung: kalau channel tidak lagi "joined", paksa sambung
+  // ulang alih-alih menunggu pasif.
+  useEffect(() => {
+    if (!user) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const channel = channelRef.current;
+      if (channel && channel.state !== "joined") {
+        activeRef.current = null;
+        channelRef.current = null;
+        setChannelEpoch((n) => n + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user]);
+
+  // Denyut presence: kirim ulang berkala. Kalau salah satu pihak melewatkan
+  // satu update, keadaannya kembali sinkron dalam hitungan detik.
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      if (mineRef.current && channelRef.current) {
+        void channelRef.current.track(mineRef.current);
+      }
+    }, PRESENCE_HEARTBEAT_MS);
+    return () => clearInterval(id);
   }, [user]);
 
   /* ── Peran ──────────────────────────────────────────────────────── */
@@ -312,7 +447,22 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         negotiating.current = false;
       }
     })();
-  }, [user, partner?.inCall, localReady, ensurePeer, send]);
+  }, [user, partner?.inCall, localReady, offerAttempt, manualRetry, ensurePeer, send]);
+
+  // Offer dikirim lewat broadcast yang tidak dijamin sampai. Kalau dalam
+  // beberapa detik belum tersambung, bongkar dan tawarkan ulang.
+  useEffect(() => {
+    if (user !== OFFERER) return;
+    if (!partner?.inCall || !localReady) return;
+    if (callStatus === "connected") return;
+    if (offerAttempt >= MAX_OFFER_ATTEMPTS) return;
+
+    const t = setTimeout(() => {
+      closePeer();
+      setOfferAttempt((n) => n + 1);
+    }, OFFER_RETRY_MS);
+    return () => clearTimeout(t);
+  }, [user, partner?.inCall, localReady, callStatus, offerAttempt, closePeer]);
 
   /* ── Aksi ───────────────────────────────────────────────────────── */
   const claimControl = useCallback(() => push({ isController: true }), [push]);
@@ -331,7 +481,13 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
   const startCapture = useCallback(() => {
     const id = crypto.randomUUID();
-    push({ captureId: id, stage: "countdown" });
+    // Tanggalnya ditentukan sekali oleh controller lalu disiarkan, supaya kedua
+    // frame bertuliskan tanggal yang sama walau zona waktunya berbeda.
+    push({
+      captureId: id,
+      captureDate: formatDate(new Date().toISOString()),
+      stage: "countdown",
+    });
     return id;
   }, [push]);
 
@@ -349,9 +505,26 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const endCall = useCallback(() => {
     localRef.current = null;
     setLocalReady(false);
+    setOfferAttempt(0);
     closePeer();
     push({ inCall: false });
   }, [closePeer, push]);
+
+  /**
+   * Retry manual, bisa dipicu dari kedua sisi. Controller langsung membuat
+   * offer baru; participant mengirim sinyal "restart" supaya controller yang
+   * membuatnya (arah offer tetap satu jalur, tidak berebut).
+   */
+  const retryCall = useCallback(() => {
+    if (user === OFFERER) {
+      closePeer();
+      setOfferAttempt(0);
+      setManualRetry((n) => n + 1);
+    } else {
+      closePeer();
+      send({ type: "restart" });
+    }
+  }, [user, closePeer, send]);
 
   const value = useMemo<RoomValue>(
     () => ({
@@ -362,6 +535,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       sharedTemplate: source?.template ?? "polaroid",
       sharedCount: source?.count ?? 4,
       captureId: source?.captureId ?? null,
+      captureDate: source?.captureDate ?? null,
       remoteStream,
       callStatus,
       claimControl,
@@ -371,6 +545,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       startCapture,
       startCall,
       endCall,
+      retryCall,
     }),
     [
       partner,
@@ -385,6 +560,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       startCapture,
       startCall,
       endCall,
+      retryCall,
     ],
   );
 
